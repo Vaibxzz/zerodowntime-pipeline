@@ -1,0 +1,10 @@
+bin/
+*.exe
+*.test
+*.out
+coverage.out
+*.prof
+.env
+.env.*
+!.env.example
+vendor/

@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zerodowntime-app
+  namespace: zerodowntime
+  labels:
+    app: zerodowntime-app
+    app.kubernetes.io/name: zerodowntime-app
+    app.kubernetes.io/part-of: zerodowntime-pipeline
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # At most 1 pod unavailable during rollout — keeps capacity near 100%
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: zerodowntime-app
+  template:
+    metadata:
+      labels:
+        app: zerodowntime-app
+        version: stable
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      terminationGracePeriodSeconds: 45
+      containers:
+        - name: app
+          image: ghcr.io/vaibhavsrivastava/zerodowntime-app:latest
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "8080"
+            - name: APP_VERSION
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['version']
+            - name: DRAIN_DELAY
+              value: "5s"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            failureThreshold: 2
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 1
+            periodSeconds: 2
+            failureThreshold: 15
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 5"]

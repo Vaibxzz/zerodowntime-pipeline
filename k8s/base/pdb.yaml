@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: zerodowntime-app
+  namespace: zerodowntime
+spec:
+  # At least 2 pods must stay running during voluntary disruptions
+  # (node drains, cluster upgrades, etc.)
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: zerodowntime-app

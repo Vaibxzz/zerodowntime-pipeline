@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: zerodowntime-app-canary
+  namespace: zerodowntime
+  labels:
+    app: zerodowntime-app
+    track: canary
+  annotations:
+    # NGINX ingress canary annotations split a percentage of traffic
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-weight: "10"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: zerodowntime-app-canary
+                port:
+                  name: http
