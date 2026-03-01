@@ -16,6 +16,16 @@ A production-grade CI/CD pipeline that takes code from a GitHub push to producti
                      └────────────┘       └────────────┘
 ```
 
+## Pipeline in Action
+
+**CI & CD workflow runs — all green:**
+
+![GitHub Actions Overview](screenshots/actions-overview.png)
+
+**Full canary deployment flow — Deploy → Analyse → Promote (Rollback skipped):**
+
+![CD Canary Flow](screenshots/cd-run-job-flow.png)
+
 ## Architecture
 
 ### Pipeline Flow
