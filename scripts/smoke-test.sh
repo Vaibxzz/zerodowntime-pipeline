@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # smoke-test.sh — Run lightweight HTTP checks against the deployed service.
 #
+# Uses the ClusterIP service DNS name from a temporary curl pod,
+# since our app containers are distroless (no shell).
+#
 # Usage: smoke-test.sh <track>
 #   track: "stable" | "canary"
 #
@@ -23,7 +26,6 @@ echo "Service: ${SVC}"
 echo "Namespace: ${NAMESPACE}"
 echo ""
 
-# Wait for at least one ready pod
 echo "[1/4] Waiting for ready pods..."
 kubectl wait --for=condition=ready pod \
   -l "app=zerodowntime-app" \
@@ -35,18 +37,21 @@ FAIL=0
 
 run_check() {
   local NAME="$1"
-  local PATH="$2"
+  local ENDPOINT="$2"
   local EXPECTED_STATUS="${3:-200}"
+  local URL="http://${SVC}.${NAMESPACE}.svc.cluster.local${ENDPOINT}"
 
-  for i in $(seq 1 "${RETRIES}"); do
-    POD=$(kubectl get pods -n "${NAMESPACE}" -l "app=zerodowntime-app" \
-      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+  local i=1
+  while [ "$i" -le "${RETRIES}" ]; do
+    STATUS=$(kubectl run "smoke-${TRACK}-${i}-$(date +%s)" \
+      --image=curlimages/curl:8.5.0 \
+      --restart=Never \
+      --rm \
+      -n "${NAMESPACE}" \
+      -i --quiet \
+      -- -s -o /dev/null -w '%{http_code}' -m 5 "${URL}" 2>/dev/null || echo "000")
 
-    STATUS=$(kubectl exec -n "${NAMESPACE}" "${POD}" -- \
-      wget -qSO /dev/null -T 5 "http://localhost:8080${PATH}" 2>&1 \
-      | grep "HTTP/" | awk '{print $2}' || echo "000")
-
-    if [[ "${STATUS}" == "${EXPECTED_STATUS}" ]]; then
+    if [ "${STATUS}" = "${EXPECTED_STATUS}" ]; then
       echo "  PASS: ${NAME} (${STATUS})"
       PASS=$((PASS + 1))
       return 0
@@ -54,6 +59,7 @@ run_check() {
 
     echo "  RETRY ${i}/${RETRIES}: ${NAME} got ${STATUS}, expected ${EXPECTED_STATUS}"
     sleep "${RETRY_DELAY}"
+    i=$((i + 1))
   done
 
   echo "  FAIL: ${NAME} — never returned ${EXPECTED_STATUS}"
@@ -75,7 +81,7 @@ echo "=== Results ==="
 echo "Passed: ${PASS}"
 echo "Failed: ${FAIL}"
 
-if [[ "${FAIL}" -gt 0 ]]; then
+if [ "${FAIL}" -gt 0 ]; then
   echo "Smoke tests FAILED"
   exit 1
 fi

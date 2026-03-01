@@ -6,8 +6,7 @@
 #
 # The script polls the canary pods every 15 seconds, checking:
 #   1. Pod readiness (kubectl)
-#   2. HTTP 200 from the canary service
-#   3. Cumulative error rate from Prometheus (if available)
+#   2. HTTP 200 from the canary service (via temporary curl pod)
 #
 # Outputs: sets GitHub Actions output `healthy=true|false`
 
@@ -31,42 +30,43 @@ echo ""
 START=$(date +%s)
 END=$((START + ANALYSIS_DURATION))
 
-while [[ $(date +%s) -lt ${END} ]]; do
+while [ "$(date +%s)" -lt "${END}" ]; do
   TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
   ELAPSED=$(($(date +%s) - START))
-  echo -n "[${ELAPSED}s] Check #${TOTAL_CHECKS}: "
+  printf "[%ds] Check #%d: " "${ELAPSED}" "${TOTAL_CHECKS}"
 
-  # Check 1: Are canary pods ready?
   READY_PODS=$(kubectl get pods -n "${NAMESPACE}" \
     -l "app=zerodowntime-app,track=canary" \
     -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' \
     2>/dev/null | grep -c "True" || echo "0")
 
-  if [[ "${READY_PODS}" -eq 0 ]]; then
+  if [ "${READY_PODS}" -eq 0 ]; then
     echo "FAIL — no ready canary pods"
     FAILED_CHECKS=$((FAILED_CHECKS + 1))
     sleep "${POLL_INTERVAL}"
     continue
   fi
 
-  # Check 2: HTTP health check via port-forward (or service DNS in-cluster)
-  HTTP_STATUS=$(kubectl exec -n "${NAMESPACE}" \
-    "$(kubectl get pods -n "${NAMESPACE}" -l "app=zerodowntime-app,track=canary" -o jsonpath='{.items[0].metadata.name}')" \
-    -- wget -qO- -T 5 "http://localhost:8080/healthz" 2>/dev/null \
-    && echo "ok" || echo "fail")
+  HTTP_STATUS=$(kubectl run "canary-check-$(date +%s)" \
+    --image=curlimages/curl:8.5.0 \
+    --restart=Never \
+    --rm \
+    -n "${NAMESPACE}" \
+    -i --quiet \
+    -- -s -o /dev/null -w '%{http_code}' -m 5 \
+    "http://${CANARY_SVC}.${NAMESPACE}.svc.cluster.local/healthz" 2>/dev/null || echo "000")
 
-  if [[ "${HTTP_STATUS}" == "fail" ]]; then
-    echo "FAIL — health check returned error"
-    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+  if [ "${HTTP_STATUS}" = "200" ]; then
+    echo "PASS — ${READY_PODS} ready pod(s), health 200"
   else
-    echo "PASS — ${READY_PODS} ready pod(s), health OK"
+    echo "FAIL — health check returned ${HTTP_STATUS}"
+    FAILED_CHECKS=$((FAILED_CHECKS + 1))
   fi
 
   sleep "${POLL_INTERVAL}"
 done
 
-# Calculate error rate
-if [[ "${TOTAL_CHECKS}" -gt 0 ]]; then
+if [ "${TOTAL_CHECKS}" -gt 0 ]; then
   ERROR_RATE=$(( (FAILED_CHECKS * 100) / TOTAL_CHECKS ))
 else
   ERROR_RATE=100
@@ -79,7 +79,7 @@ echo "Failed:       ${FAILED_CHECKS}"
 echo "Error rate:   ${ERROR_RATE}%"
 echo "Threshold:    ${ERROR_THRESHOLD}%"
 
-if [[ "${ERROR_RATE}" -le "${ERROR_THRESHOLD}" ]]; then
+if [ "${ERROR_RATE}" -le "${ERROR_THRESHOLD}" ]; then
   echo "Result: HEALTHY — promoting canary"
   echo "healthy=true" >> "${GITHUB_OUTPUT:-/dev/null}"
 else
