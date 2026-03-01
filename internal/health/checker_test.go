@@ -33,7 +33,9 @@ func TestReadiness_NotReadyByDefault(t *testing.T) {
 	}
 
 	var resp map[string]string
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
 	if resp["status"] != "not_ready" {
 		t.Errorf("expected not_ready, got %s", resp["status"])
 	}
