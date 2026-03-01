@@ -72,9 +72,9 @@ jobs:
             -n "$NAMESPACE" --overwrite
 
       - name: Notify Slack — canary started
-        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: env.SLACK_WEBHOOK_URL != ''
         run: |
           bash scripts/notify.sh \
             ":canary: Canary deployed at ${{ env.CANARY_WEIGHT_START }}% traffic" \
@@ -161,9 +161,9 @@ jobs:
         run: bash scripts/smoke-test.sh stable
 
       - name: Notify Slack — promotion success
-        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: env.SLACK_WEBHOOK_URL != ''
         run: |
           bash scripts/notify.sh \
             ":rocket: Production promoted to \`${{ needs.canary-deploy.outputs.image_tag }}\`" \
@@ -197,9 +197,9 @@ jobs:
         run: bash scripts/rollback.sh
 
       - name: Notify Slack — rollback
-        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: env.SLACK_WEBHOOK_URL != ''
         run: |
           bash scripts/notify.sh \
             ":rotating_light: Canary ROLLED BACK — \`${{ needs.canary-deploy.outputs.image_tag }}\` failed analysis" \
