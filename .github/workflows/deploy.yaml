@@ -53,6 +53,14 @@ jobs:
       - name: Ensure namespace exists
         run: kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Ensure image pull secret
+        run: |
+          kubectl create secret docker-registry ghcr-pull-secret \
+            --docker-server=ghcr.io \
+            --docker-username="${{ github.repository_owner }}" \
+            --docker-password="${{ secrets.GHCR_PAT }}" \
+            -n "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Deploy canary pods
         run: |
           IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}"

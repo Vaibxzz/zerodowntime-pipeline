@@ -1,6 +1,6 @@
 APP_NAME     := zerodowntime-app
 VERSION      ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "dev")
-REGISTRY     ?= ghcr.io/vaibhavsrivastava
+REGISTRY     ?= ghcr.io/vaibxzz
 IMAGE        := $(REGISTRY)/$(APP_NAME):$(VERSION)
 NAMESPACE    ?= zerodowntime
 

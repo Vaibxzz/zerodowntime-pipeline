@@ -29,10 +29,12 @@ spec:
         prometheus.io/port: "8080"
         prometheus.io/path: "/metrics"
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       terminationGracePeriodSeconds: 45
       containers:
         - name: app
-          image: ghcr.io/vaibhavsrivastava/zerodowntime-app:latest
+          image: ghcr.io/vaibxzz/zerodowntime-app:main
           ports:
             - containerPort: 8080
               name: http
