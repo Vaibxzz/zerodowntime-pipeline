@@ -12,7 +12,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/zerodowntime-app
+  IMAGE_NAME: vaibxzz/zerodowntime-app
   NAMESPACE: zerodowntime
   CANARY_WEIGHT_START: "10"
   CANARY_ANALYSIS_SECONDS: "120"
